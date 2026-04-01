@@ -52,31 +52,27 @@ root/
 
 
 ---
+Sceenshorts
 
-## 📸 Screenshots
 
 ### 💬 Chat Page
-![Chat Page](food-donation-frontend/screenshorts/chat-page.png)
+![Chat Page](food-donation-frontend/screenshorts/chat.png)
 
-### 📊 Dashboard
-![Dashboard](food-donation-frontend/screenshots/dashboard.png)
+### 📊 Claims-page
+![Dashboard](food-donation-frontend/screenshorts/claims-page.png)
 
-### 📍 Map View
-![Map](food-donation-frontend/screenshots/map.png)
+### 📍 Donor Dashboard
+![Map](food-donation-frontend/screenshorts/donor-dashboard.png)
 
-### ➕ Add Food
-![Add Food](food-donation-frontend/screenshots/add-food.png)
+### ➕ Landing page
+![Add Food](food-donation-frontend/screenshorts/landing-page.png)
 
-### 📦 Listings
-![Listings](food-donation-frontend/screenshots/listings.png)
+### 📦 Map page
+![Listings](food-donation-frontend/screenshorts/map-page.png)
 
-### 🔐 Login Page
-![Login](food-donation-frontend/screenshots/login.png)
+### 🔐 reciver Dashboard
+![Login](food-donation-frontend/screenshorts/reciver-dashboard.png)
 
-### 🧾 Register Page
-![Register](food-donation-frontend/screenshots/register.png)
-
----
 
 ## ⚙️ Installation
 
