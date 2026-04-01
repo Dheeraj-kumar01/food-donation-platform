@@ -56,7 +56,7 @@ root/
 ## 📸 Screenshots
 
 ### 💬 Chat Page
-![Chat Page](chat-page.png)
+![Chat Page](food-donation-frontend/screenshorts/chat-page.png)
 
 ### 📊 Dashboard
 ![Dashboard](food-donation-frontend/screenshots/dashboard.png)
