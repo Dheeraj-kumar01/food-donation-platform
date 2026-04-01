@@ -1,23 +1,35 @@
 const express = require('express');
 const {
-  claimFood,
-  acceptClaim,
-  rejectClaim,
+  getDonorRequests,
+  getReceiverClaims,
+  acceptRequest,
+  rejectRequest,
+  generateOTP,
   verifyOTP,
-  getMyClaims,
-  getMyRequests,
-  rateClaim
+  resendOTP,
+  completeRequest
 } = require('../controllers/requestController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
-router.post('/', protect, authorize('receiver'), claimFood);
-router.get('/my-claims', protect, authorize('receiver'), getMyClaims);
-router.get('/my-requests', protect, authorize('donor'), getMyRequests);
-router.put('/:id/accept', protect, authorize('donor'), acceptClaim);
-router.put('/:id/reject', protect, authorize('donor'), rejectClaim);
-router.post('/:id/verify', protect, authorize('receiver'), verifyOTP);
-router.post('/:id/rate', protect, rateClaim);
+// All routes require authentication
+router.use(protect);
+
+// ============================================
+// DONOR ROUTES
+// ============================================
+router.get('/donor/requests', authorize('donor'), getDonorRequests);
+router.put('/:id/accept', authorize('donor'), acceptRequest);
+router.put('/:id/reject', authorize('donor'), rejectRequest);
+router.post('/:id/generate-otp', authorize('donor'), generateOTP);
+router.post('/:id/resend-otp', authorize('donor'), resendOTP);
+
+// ============================================
+// RECEIVER ROUTES
+// ============================================
+router.get('/receiver/claims', authorize('receiver'), getReceiverClaims);
+router.post('/:id/verify', authorize('receiver'), verifyOTP);
+router.put('/:id/complete', authorize('receiver'), completeRequest);
 
 module.exports = router;

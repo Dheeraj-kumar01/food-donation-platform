@@ -23,11 +23,11 @@ const requestSchema = new mongoose.Schema({
   },
   otp: {
     type: String,
-    select: false
+    default: null  // Make sure OTP can be stored
   },
   otpExpiry: {
     type: Date,
-    select: false
+    default: null  // Make sure expiry can be stored
   },
   message: {
     type: String,
@@ -49,6 +49,7 @@ const requestSchema = new mongoose.Schema({
   timestamps: true
 });
 
+// Create indexes
 requestSchema.index({ food: 1, receiver: 1 }, { unique: true });
 requestSchema.index({ donor: 1, status: 1 });
 requestSchema.index({ receiver: 1, status: 1 });

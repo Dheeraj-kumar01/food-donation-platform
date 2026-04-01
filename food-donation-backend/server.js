@@ -46,15 +46,15 @@ app.use((req, res, next) => {
 const authRoutes = require('./routes/authRoutes');
 const foodRoutes = require('./routes/foodRoutes');
 const requestRoutes = require('./routes/requestRoutes');
-const chatRoutes = require('./routes/chatRoutes');
-const donorRoutes = require('./routes/donorRoutes'); // Add this
+const chatRoutes = require('./routes/chatRoutes'); // <-- ADD THIS
+const donorRoutes = require('./routes/donorRoutes');
 
 // Mount routers
 app.use('/api/auth', authRoutes);
 app.use('/api/food', foodRoutes);
 app.use('/api/requests', requestRoutes);
-app.use('/api/chat', chatRoutes);
-app.use('/api/donor', donorRoutes); // Add this
+app.use('/api/chat', chatRoutes); // <-- ADD THIS
+app.use('/api/donor', donorRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

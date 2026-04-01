@@ -1,59 +1,65 @@
 const Request = require('../models/Request');
 const FoodListing = require('../models/FoodListing');
 const User = require('../models/User');
-const { generateOTP, isOTPExpired } = require('../utils/generateOTP');
 
-// @desc    Claim food
-// @route   POST /api/requests
-// @access  Private (Receiver only)
-const claimFood = async (req, res) => {
+// Generate 6-digit OTP
+const generateOTPCode = () => {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+};
+
+// Check if OTP is expired
+const isOTPExpired = (otpExpiry) => {
+  if (!otpExpiry) return true;
+  return new Date() > new Date(otpExpiry);
+};
+
+// @desc    Get all requests for donor's food
+// @route   GET /api/requests/donor/requests
+// @access  Private (Donor only)
+const getDonorRequests = async (req, res) => {
   try {
-    const { foodId, message } = req.body;
-
-    const food = await FoodListing.findById(foodId);
-    if (!food) {
-      return res.status(404).json({ message: 'Food not found' });
-    }
-
-    if (food.status !== 'available') {
-      return res.status(400).json({ message: 'Food is no longer available' });
-    }
-
-    const expiryDateTime = new Date(`${food.expiryDate}T${food.expiryTime}`);
-    if (expiryDateTime < new Date()) {
-      return res.status(400).json({ message: 'Food has expired' });
-    }
-
-    // Check if already claimed by this user
-    const existingClaim = await Request.findOne({
-      food: foodId,
-      receiver: req.user._id,
-      status: { $in: ['pending', 'accepted'] }
-    });
-
-    if (existingClaim) {
-      return res.status(400).json({ message: 'You have already claimed this food' });
-    }
-
-    const request = await Request.create({
-      food: foodId,
-      donor: food.donor,
-      receiver: req.user._id,
-      message,
-      status: 'pending'
-    });
-
-    res.status(201).json(request);
+    const requests = await Request.find({ donor: req.user._id })
+      .populate('food', 'name quantity unit image pickupAddress')
+      .populate('receiver', 'name phone address')
+      .sort({ createdAt: -1 });
+    
+    res.json(requests);
   } catch (error) {
-    console.error(error);
+    console.error('Get donor requests error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
 
-// @desc    Accept claim
+// @desc    Get all claims for receiver
+// @route   GET /api/requests/receiver/claims
+// @access  Private (Receiver only)
+const getReceiverClaims = async (req, res) => {
+  try {
+    const claims = await Request.find({ receiver: req.user._id })
+      .populate('food', 'name quantity unit image pickupAddress')
+      .populate('donor', 'name phone address')
+      .sort({ createdAt: -1 });
+    
+    // Include OTP in response only for accepted claims
+    const claimsWithOTP = claims.map(claim => {
+      const claimObj = claim.toObject();
+      if (claimObj.status === 'accepted' && claimObj.otp) {
+        claimObj.otp = claimObj.otp; // Include OTP for accepted claims
+      }
+      return claimObj;
+    });
+    
+    res.json(claimsWithOTP);
+  } catch (error) {
+    console.error('Get receiver claims error:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// @desc    Accept a request (Donor)
 // @route   PUT /api/requests/:id/accept
 // @access  Private (Donor only)
-const acceptClaim = async (req, res) => {
+const acceptRequest = async (req, res) => {
   try {
     const request = await Request.findById(req.params.id)
       .populate('food', 'name quantity unit')
@@ -63,45 +69,40 @@ const acceptClaim = async (req, res) => {
       return res.status(404).json({ message: 'Request not found' });
     }
 
+    // Check if donor owns this request
     if (request.donor.toString() !== req.user._id.toString()) {
-      return res.status(401).json({ message: 'Not authorized' });
+      return res.status(403).json({ message: 'Not authorized' });
     }
 
+    // Check if request is still pending
     if (request.status !== 'pending') {
       return res.status(400).json({ message: 'Request already processed' });
     }
 
-    // Generate OTP
-    const otp = generateOTP();
-    const otpExpiry = new Date();
-    otpExpiry.setMinutes(otpExpiry.getMinutes() + 30); // OTP valid for 30 minutes
-
-    request.otp = otp;
-    request.otpExpiry = otpExpiry;
+    // Update request status
     request.status = 'accepted';
     await request.save();
 
     // Update food status
     await FoodListing.findByIdAndUpdate(request.food._id, {
-      status: 'claimed',
-      claimedBy: request.receiver._id
+      status: 'claimed'
     });
 
     res.json({
-      message: 'Claim accepted',
-      request,
-      otp // Send OTP to donor
+      success: true,
+      message: 'Request accepted successfully',
+      request
     });
   } catch (error) {
-    console.error(error);
+    console.error('Accept request error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
 
-// @desc    Reject claim
+// @desc    Reject a request (Donor)
 // @route   PUT /api/requests/:id/reject
 // @access  Private (Donor only)
-const rejectClaim = async (req, res) => {
+const rejectRequest = async (req, res) => {
   try {
     const request = await Request.findById(req.params.id);
 
@@ -109,61 +110,133 @@ const rejectClaim = async (req, res) => {
       return res.status(404).json({ message: 'Request not found' });
     }
 
+    // Check if donor owns this request
     if (request.donor.toString() !== req.user._id.toString()) {
-      return res.status(401).json({ message: 'Not authorized' });
+      return res.status(403).json({ message: 'Not authorized' });
     }
 
+    // Check if request is still pending
     if (request.status !== 'pending') {
       return res.status(400).json({ message: 'Request already processed' });
     }
 
+    // Update request status
     request.status = 'rejected';
     await request.save();
 
-    res.json({ message: 'Claim rejected', request });
+    // Update food status back to available
+    await FoodListing.findByIdAndUpdate(request.food, {
+      status: 'available',
+      claimedBy: null
+    });
+
+    res.json({
+      success: true,
+      message: 'Request rejected',
+      request
+    });
   } catch (error) {
-    console.error(error);
+    console.error('Reject request error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
 
-// @desc    Verify OTP and complete claim
+// @desc    Generate OTP for pickup (Donor)
+// @route   POST /api/requests/:id/generate-otp
+// @access  Private (Donor only)
+const generateOTP = async (req, res) => {
+  try {
+    const request = await Request.findById(req.params.id);
+
+    if (!request) {
+      return res.status(404).json({ message: 'Request not found' });
+    }
+
+    // Check if donor owns this request
+    if (request.donor.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Not authorized' });
+    }
+
+    // Check if request is accepted
+    if (request.status !== 'accepted') {
+      return res.status(400).json({ message: 'Request must be accepted first' });
+    }
+
+    // Generate OTP
+    const otp = generateOTPCode();
+    const otpExpiry = new Date();
+    otpExpiry.setMinutes(otpExpiry.getMinutes() + 30); // OTP valid for 30 minutes
+
+    // Save OTP to database
+    request.otp = otp;
+    request.otpExpiry = otpExpiry;
+    await request.save();
+
+    console.log(`OTP generated for request ${request._id}: ${otp}`);
+    console.log(`OTP Expiry: ${otpExpiry}`);
+
+    res.json({
+      success: true,
+      message: 'OTP generated successfully',
+      otp: otp,
+      expiry: otpExpiry
+    });
+  } catch (error) {
+    console.error('Generate OTP error:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// @desc    Verify OTP and complete pickup (Receiver)
 // @route   POST /api/requests/:id/verify
 // @access  Private (Receiver only)
 const verifyOTP = async (req, res) => {
   try {
     const { otp } = req.body;
     const request = await Request.findById(req.params.id)
-      .populate('food', 'name quantity unit donor');
+      .populate('food', 'name');
 
     if (!request) {
       return res.status(404).json({ message: 'Request not found' });
     }
 
+    // Check if receiver owns this request
     if (request.receiver.toString() !== req.user._id.toString()) {
-      return res.status(401).json({ message: 'Not authorized' });
+      return res.status(403).json({ message: 'Not authorized' });
     }
 
+    // Check if request is accepted
     if (request.status !== 'accepted') {
-      return res.status(400).json({ message: 'Claim not accepted yet' });
+      return res.status(400).json({ message: 'Request not accepted yet' });
     }
 
+    // Check if OTP exists
+    if (!request.otp) {
+      console.log(`No OTP found for request ${request._id}`);
+      return res.status(400).json({ message: 'No OTP generated for this request. Please contact the donor to generate OTP.' });
+    }
+
+    // Check if OTP matches
     if (request.otp !== otp) {
+      console.log(`Invalid OTP. Expected: ${request.otp}, Received: ${otp}`);
       return res.status(400).json({ message: 'Invalid OTP' });
     }
 
+    // Check if OTP is expired
     if (isOTPExpired(request.otpExpiry)) {
-      return res.status(400).json({ message: 'OTP has expired' });
+      console.log(`OTP expired for request ${request._id}`);
+      return res.status(400).json({ message: 'OTP has expired. Please request a new OTP from donor.' });
     }
 
+    // Update request status
     request.status = 'completed';
     request.completedAt = new Date();
-    request.otp = undefined;
-    request.otpExpiry = undefined;
+    request.otp = null;
+    request.otpExpiry = null;
     await request.save();
 
     // Update food status
-    await FoodListing.findByIdAndUpdate(request.food._id, {
+    await FoodListing.findByIdAndUpdate(request.food, {
       status: 'completed'
     });
 
@@ -172,85 +245,104 @@ const verifyOTP = async (req, res) => {
       $inc: { totalClaims: 1 }
     });
 
-    res.json({ message: 'Food delivered successfully', request });
+    res.json({
+      success: true,
+      message: 'Pickup completed successfully!',
+      request
+    });
   } catch (error) {
-    console.error(error);
+    console.error('Verify OTP error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
 
-// @desc    Get my claims (receiver)
-// @route   GET /api/requests/my-claims
-// @access  Private (Receiver)
-const getMyClaims = async (req, res) => {
+// @desc    Resend OTP (Donor)
+// @route   POST /api/requests/:id/resend-otp
+// @access  Private (Donor only)
+const resendOTP = async (req, res) => {
   try {
-    const claims = await Request.find({ receiver: req.user._id })
-      .populate('food', 'name quantity unit image pickupAddress')
-      .populate('donor', 'name phone')
-      .sort({ createdAt: -1 });
-    
-    res.json(claims);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error', error: error.message });
-  }
-};
-
-// @desc    Get requests for my food (donor)
-// @route   GET /api/requests/my-requests
-// @access  Private (Donor)
-const getMyRequests = async (req, res) => {
-  try {
-    const requests = await Request.find({ donor: req.user._id })
-      .populate('food', 'name quantity unit image')
-      .populate('receiver', 'name phone')
-      .sort({ createdAt: -1 });
-    
-    res.json(requests);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error', error: error.message });
-  }
-};
-
-// @desc    Add rating for claim
-// @route   POST /api/requests/:id/rate
-// @access  Private
-const rateClaim = async (req, res) => {
-  try {
-    const { rating, review } = req.body;
     const request = await Request.findById(req.params.id);
 
     if (!request) {
       return res.status(404).json({ message: 'Request not found' });
     }
 
-    if (request.status !== 'completed') {
-      return res.status(400).json({ message: 'Can only rate completed claims' });
+    // Check if donor owns this request
+    if (request.donor.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Not authorized' });
     }
 
-    if (request.receiver.toString() !== req.user._id.toString() && 
-        request.donor.toString() !== req.user._id.toString()) {
-      return res.status(401).json({ message: 'Not authorized' });
+    // Check if request is accepted
+    if (request.status !== 'accepted') {
+      return res.status(400).json({ message: 'Request must be accepted first' });
     }
 
-    request.rating = rating;
-    request.review = review;
+    // Generate new OTP
+    const otp = generateOTPCode();
+    const otpExpiry = new Date();
+    otpExpiry.setMinutes(otpExpiry.getMinutes() + 30);
+
+    request.otp = otp;
+    request.otpExpiry = otpExpiry;
     await request.save();
 
-    res.json({ message: 'Rating added successfully', request });
+    console.log(`OTP resent for request ${request._id}: ${otp}`);
+
+    res.json({
+      success: true,
+      message: 'OTP resent successfully',
+      otp: otp,
+      expiry: otpExpiry
+    });
   } catch (error) {
-    console.error(error);
+    console.error('Resend OTP error:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// @desc    Complete request (Receiver marks as delivered)
+// @route   PUT /api/requests/:id/complete
+// @access  Private (Receiver only)
+const completeRequest = async (req, res) => {
+  try {
+    const request = await Request.findById(req.params.id);
+
+    if (!request) {
+      return res.status(404).json({ message: 'Request not found' });
+    }
+
+    // Check if receiver owns this request
+    if (request.receiver.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Not authorized' });
+    }
+
+    // Check if request is accepted
+    if (request.status !== 'accepted') {
+      return res.status(400).json({ message: 'Request not accepted yet' });
+    }
+
+    request.status = 'completed';
+    request.completedAt = new Date();
+    await request.save();
+
+    res.json({
+      success: true,
+      message: 'Request completed successfully',
+      request
+    });
+  } catch (error) {
+    console.error('Complete request error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
 
 module.exports = {
-  claimFood,
-  acceptClaim,
-  rejectClaim,
+  getDonorRequests,
+  getReceiverClaims,
+  acceptRequest,
+  rejectRequest,
+  generateOTP,
   verifyOTP,
-  getMyClaims,
-  getMyRequests,
-  rateClaim
+  resendOTP,
+  completeRequest
 };
