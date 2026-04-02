@@ -1,40 +1,36 @@
-# 🍽️ Food Donation Platform
+# Food Donation Platform
 
 A full-stack MERN application that connects **food donors** with **people in need**, helping reduce food waste and support communities.
 
----
 
-## 🚀 Features
+## Features
 
-- 🧑‍🤝‍🧑 User Authentication (Donor / Receiver)
-- 📍 Location-based food listings
-- 🍱 Add & manage food donations
-- 📦 Real-time availability tracking
-- 🗺️ Map integration for nearby food
-- 📊 Dashboard for activity tracking
+- User Authentication (Donor / Receiver)
+- Location-based food listings
+- Add & manage food donations
+- Real-time availability tracking
+- Map integration for nearby food
+- Dashboard for activity tracking
 
----
+## Tech Stack
 
-## 🛠️ Tech Stack
-
-**Frontend:**
+Frontend:
 - React.js
 - Tailwind CSS / CSS
 - Axios
 
-**Backend:**
+Backend:
 - Node.js
 - Express.js
 - MongoDB
 
-**Other:**
+Other:
 - JWT Authentication
 - Cloudinary (for images)
 - Map API (for location)
 
----
 
-## 📁 Project Structure
+## Project Structure
 
 root/
 │
@@ -51,32 +47,31 @@ root/
 └── README.md
 
 
----
 Sceenshorts
 
 
-### 💬 Chat Page
+### Chat Page
 ![Chat Page](food-donation-frontend/screenshorts/chat.png)
 
-### 📊 Claims-page
+### Claims-page
 ![Dashboard](food-donation-frontend/screenshorts/claims-page.png)
 
-### 📍 Donor Dashboard
+### Donor Dashboard
 ![Map](food-donation-frontend/screenshorts/donor-dashboard.png)
 
-### ➕ Landing page
+### Landing page
 ![Add Food](food-donation-frontend/screenshorts/landing-page.png)
 
-### 📦 Map page
+### Map page
 ![Listings](food-donation-frontend/screenshorts/map-page.png)
 
-### 🔐 reciver Dashboard
+### reciver Dashboard
 ![Login](food-donation-frontend/screenshorts/reciver-dashboard.png)
 
 
 ## ⚙️ Installation
 
-### 1️⃣ Clone the repository
+### 1️Clone the repository
 ```bash
 git clone https://github.com/Dheeraj-kumar01/food-donation-platform.git
 cd food-donation-platform
@@ -95,18 +90,20 @@ npm start
 Frontend
 cd food-donation-frontend
 npm run dev
-🌍 Environment Variables
+
+ Environment Variables
 
 Create a .env file in backend:
 
 MONGO_URI=your_mongodb_uri
 JWT_SECRET=your_secret_key
 CLOUDINARY_URL=your_cloudinary_url
-🤝 Contribution
+
+ Contribution
 
 Feel free to fork this repo and contribute!
 
-📌 Author
+Author
 
 Dheeraj Kumar
 
